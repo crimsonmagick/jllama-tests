@@ -8,6 +8,7 @@ import net.jllama.llama.cpp.java.bindings.LlamaContextParams;
 import net.jllama.llama.cpp.java.bindings.LlamaCpp;
 import net.jllama.llama.cpp.java.bindings.LlamaCppManager;
 import net.jllama.llama.cpp.java.bindings.LlamaLogLevel;
+import net.jllama.llama.cpp.java.bindings.LlamaModelParams;
 import net.jllama.llama.cpp.java.bindings.LlamaOpaqueContext;
 import net.jllama.llama.cpp.java.bindings.LlamaOpaqueModel;
 import net.jllama.llama.cpp.java.bindings.LlamaTokenDataArray;
@@ -61,10 +62,11 @@ public class Main {
       long timestamp1 = llamaCpp.llamaTimeUs();
 
       final LlamaContextParams llamaContextParams = llamaCpp.llamaContextDefaultParams();
+      final LlamaModelParams llamaModelParams = llamaCpp.llamaModelDefaultParams();
       llamaOpaqueModel = llamaCpp.llamaLoadModelFromFile(
-          modelPath.getBytes(StandardCharsets.UTF_8), llamaContextParams);
+          modelPath.getBytes(StandardCharsets.UTF_8), llamaModelParams);
       llamaOpaqueContext =
-          llamaCpp.llamaLoadContextWithModel(llamaOpaqueModel, llamaContextParams);
+          llamaCpp.llamaNewContextWithModel(llamaOpaqueModel, llamaContextParams);
 
       long timestamp2 = llamaCpp.llamaTimeUs();
 
@@ -78,7 +80,7 @@ public class Main {
 
       System.out.print(detokenizer.detokenize(toList(tokens), llamaOpaqueContext));
 
-      llamaCpp.llamaEval(llamaOpaqueContext, tokens, tokens.length, 0, threads);
+      llamaCpp.llamaEval(llamaOpaqueContext, tokens, tokens.length, 0);
       float[] logits = llamaCpp.llamaGetLogits(llamaOpaqueContext);
       LlamaTokenDataArray candidates = LlamaTokenDataArray.logitsToTokenDataArray(logits);
       final float temp = 0.35f;
@@ -91,7 +93,7 @@ public class Main {
       previousTokenList.add(previousToken);
 
       for (int i = tokens.length + 1; previousToken != llamaCpp.llamaTokenEos(llamaOpaqueContext) && i < llamaContextParams.getnCtx(); i++) {
-        final int res = llamaCpp.llamaEval(llamaOpaqueContext, new int[]{previousToken}, 1, i, threads);
+        final int res = llamaCpp.llamaEval(llamaOpaqueContext, new int[]{previousToken}, 1, i);
         if (res != 0) {
           throw new RuntimeException("Non zero response from eval");
         }
@@ -122,7 +124,7 @@ public class Main {
   private static int[] tokenize(final String text, boolean addBos) {
     final int maxLength = text.length();
     final int[] temp = new int[maxLength];
-    int length = llamaCpp.llamaTokenizeWithModel(llamaOpaqueModel, text.getBytes(StandardCharsets.UTF_8), temp, maxLength, addBos);
+    int length = llamaCpp.llamaTokenize(llamaOpaqueModel, text.getBytes(StandardCharsets.UTF_8), temp, maxLength, addBos);
     final int[] ret = new int[length];
     System.arraycopy(temp, 0, ret, 0, length);
     return ret;
