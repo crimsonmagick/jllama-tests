@@ -20,7 +20,7 @@ import java.nio.charset.StandardCharsets;
 
 public class Main {
 
-  private static final String SYSTEM_PROMPT = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible. If you don't know something, answer that you do not know. Take your time and be accurate.";
+  private static final String SYSTEM_PROMPT = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible. If you don't know something, answer that you do not know.";
   private static final String COMPLETION_PROMPT = "I love my Cat Winnie, he is such a great cat! Let me tell you more about ";
 
   private static final String B_INST = "<s>[INST]";
@@ -62,6 +62,10 @@ public class Main {
       long timestamp1 = llamaCpp.llamaTimeUs();
 
       final LlamaContextParams llamaContextParams = llamaCpp.llamaContextDefaultParams();
+      final int threads = Runtime.getRuntime().availableProcessors() / 2 - 1;
+      llamaContextParams.setnThreads(threads);
+      llamaContextParams.setnThreadsBatch(threads);
+
       final LlamaModelParams llamaModelParams = llamaCpp.llamaModelDefaultParams();
       llamaOpaqueModel = llamaCpp.llamaLoadModelFromFile(
           modelPath.getBytes(StandardCharsets.UTF_8), llamaModelParams);
@@ -75,10 +79,7 @@ public class Main {
       final String prompt = B_INST + B_SYS + SYSTEM_PROMPT + E_SYS + "Suggest a Keto-friendly meal for dinner." + E_INST;
       final int[] tokens = tokenize(prompt, true);
 
-      // availableProcessors is the number of logical cores - we want physical cores as our basis for thread allocation
-      final int threads = Runtime.getRuntime().availableProcessors() / 2 - 1;
-
-      System.out.print(detokenizer.detokenize(toList(tokens), llamaOpaqueContext));
+      System.out.print(detokenizer.detokenize(toList(tokens), llamaOpaqueModel));
 
       llamaCpp.llamaEval(llamaOpaqueContext, tokens, tokens.length, 0);
       float[] logits = llamaCpp.llamaGetLogits(llamaOpaqueContext);
@@ -87,7 +88,7 @@ public class Main {
       llamaCpp.llamaSampleTemperature(llamaOpaqueContext, candidates, temp);
       int previousToken = llamaCpp.llamaSampleToken(llamaOpaqueContext, candidates);
 
-      System.out.print(detokenizer.detokenize(previousToken, llamaOpaqueContext));
+      System.out.print(detokenizer.detokenize(previousToken, llamaOpaqueModel));
 
       final List<Integer> previousTokenList = new ArrayList<>();
       previousTokenList.add(previousToken);
@@ -109,7 +110,7 @@ public class Main {
         llamaCpp.llamaSampleTemperature(llamaOpaqueContext, candidates, temp);
         previousToken = llamaCpp.llamaSampleToken(llamaOpaqueContext, candidates);
         previousTokenList.add(previousToken);
-        System.out.print(detokenizer.detokenize(previousToken, llamaOpaqueContext));
+        System.out.print(detokenizer.detokenize(previousToken, llamaOpaqueModel));
       }
 
       llamaCpp.llamaFree(llamaOpaqueContext);
