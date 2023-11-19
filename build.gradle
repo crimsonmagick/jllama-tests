@@ -31,10 +31,6 @@ dependencies {
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.2'
 }
 
-test {
-    useJUnitPlatform()
-}
-
 import static org.gradle.internal.os.OperatingSystem.current
 
 task runProgram(type: JavaExec) {
