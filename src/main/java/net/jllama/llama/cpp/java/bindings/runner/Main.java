@@ -8,7 +8,7 @@ import net.jllama.llama.cpp.java.bindings.LlamaContextParams;
 import net.jllama.llama.cpp.java.bindings.LlamaCpp;
 import net.jllama.llama.cpp.java.bindings.LlamaCppManager;
 import net.jllama.llama.cpp.java.bindings.LlamaModelParams;
-import net.jllama.llama.cpp.java.bindings.LlamaOpaqueContext;
+import net.jllama.llama.cpp.java.bindings.LlamaContext;
 import net.jllama.llama.cpp.java.bindings.LlamaOpaqueModel;
 import net.jllama.llama.cpp.java.bindings.LlamaTokenDataArray;
 import org.apache.logging.log4j.LogManager;
@@ -34,8 +34,12 @@ public class Main {
   }
   private static LlamaCpp llamaCpp;
   private static LlamaOpaqueModel llamaOpaqueModel;
+<<<<<<< Updated upstream
   private static LlamaOpaqueContext llamaOpaqueContext;
   final private static Logger log = LogManager.getLogger(LlamaCpp.class);
+=======
+  private static LlamaContext llamaOpaqueContext;
+>>>>>>> Stashed changes
 
   public static void main(final String[] args) {
     try {
