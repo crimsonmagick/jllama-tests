@@ -1,27 +1,26 @@
 package net.jllama.llama.cpp.java.bindings.runner;
 
 import net.jllama.llama.cpp.java.bindings.LlamaCpp;
-import net.jllama.llama.cpp.java.bindings.LlamaContext;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
-import net.jllama.llama.cpp.java.bindings.LlamaOpaqueModel;
+import net.jllama.llama.cpp.java.bindings.LlamaModel;
 
 public class Detokenizer {
 
-  public String detokenize(List<Integer> tokens, LlamaOpaqueModel llamaOpaqueModel) {
+  public String detokenize(List<Integer> tokens, LlamaModel llamaModel) {
     return tokens.stream()
-        .map(token -> detokenize(token, llamaOpaqueModel))
+        .map(token -> detokenize(token, llamaModel))
         .collect(Collectors.joining());
   }
 
-  public String detokenize(int token, LlamaOpaqueModel llamaOpaqueModel) {
+  public String detokenize(int token, LlamaModel llamaModel) {
     byte[] buf = new byte[8];
-    int length = LlamaCpp.llamaTokenToPiece(llamaOpaqueModel, token, buf);
+    int length = LlamaCpp.llamaTokenToPiece(llamaModel, token, buf);
     if (length < 0) {
       final int size = Math.abs(length);
       buf = new byte[size];
-      length = LlamaCpp.llamaTokenToPiece(llamaOpaqueModel, token, buf);
+      length = LlamaCpp.llamaTokenToPiece(llamaModel, token, buf);
     }
     if (length < 0) {
       throw new RuntimeException("Unable to allocate a large enough buffer for detokenization length.");

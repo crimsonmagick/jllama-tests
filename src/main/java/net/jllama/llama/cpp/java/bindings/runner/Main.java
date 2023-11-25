@@ -9,7 +9,7 @@ import net.jllama.llama.cpp.java.bindings.LlamaCpp;
 import net.jllama.llama.cpp.java.bindings.LlamaLogLevel;
 import net.jllama.llama.cpp.java.bindings.LlamaModelParams;
 import net.jllama.llama.cpp.java.bindings.LlamaContext;
-import net.jllama.llama.cpp.java.bindings.LlamaOpaqueModel;
+import net.jllama.llama.cpp.java.bindings.LlamaModel;
 import net.jllama.llama.cpp.java.bindings.LlamaTokenDataArray;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -33,7 +33,7 @@ public class Main {
     System.out.printf("pid=%s%n", pid);
   }
   private static volatile String appLogLevel = System.getProperty("loglevel");
-  private static LlamaOpaqueModel llamaOpaqueModel;
+  private static LlamaModel llamaModel;
   private static LlamaContext llamaOpaqueContext;
 
   public static void main(final String[] args) {
@@ -64,10 +64,10 @@ public class Main {
       llamaContextParams.setnThreadsBatch(threads);
 
       final LlamaModelParams llamaModelParams = LlamaCpp.llamaModelDefaultParams();
-      llamaOpaqueModel = LlamaCpp.llamaLoadModelFromFile(
+      llamaModel = LlamaCpp.llamaLoadModelFromFile(
           modelPath.getBytes(StandardCharsets.UTF_8), llamaModelParams);
       llamaOpaqueContext =
-          LlamaCpp.llamaNewContextWithModel(llamaOpaqueModel, llamaContextParams);
+          LlamaCpp.llamaNewContextWithModel(llamaModel, llamaContextParams);
 
       long timestamp2 = LlamaCpp.llamaTimeUs();
 
@@ -76,7 +76,7 @@ public class Main {
       final String prompt = B_INST + B_SYS + SYSTEM_PROMPT + E_SYS + "Suggest a Keto-friendly meal for dinner." + E_INST;
       final int[] tokens = tokenize(prompt, true);
 
-      System.out.print(detokenizer.detokenize(toList(tokens), llamaOpaqueModel));
+      System.out.print(detokenizer.detokenize(toList(tokens), llamaModel));
 
       LlamaCpp.llamaEval(llamaOpaqueContext, tokens, tokens.length, 0);
       float[] logits = LlamaCpp.llamaGetLogits(llamaOpaqueContext);
@@ -85,7 +85,7 @@ public class Main {
       LlamaCpp.llamaSampleTemperature(llamaOpaqueContext, candidates, temp);
       int previousToken = LlamaCpp.llamaSampleToken(llamaOpaqueContext, candidates);
 
-      System.out.print(detokenizer.detokenize(previousToken, llamaOpaqueModel));
+      System.out.print(detokenizer.detokenize(previousToken, llamaModel));
 
       final List<Integer> previousTokenList = new ArrayList<>();
       previousTokenList.add(previousToken);
@@ -107,11 +107,11 @@ public class Main {
         LlamaCpp.llamaSampleTemperature(llamaOpaqueContext, candidates, temp);
         previousToken = LlamaCpp.llamaSampleToken(llamaOpaqueContext, candidates);
         previousTokenList.add(previousToken);
-        System.out.print(detokenizer.detokenize(previousToken, llamaOpaqueModel));
+        System.out.print(detokenizer.detokenize(previousToken, llamaModel));
       }
 
       LlamaCpp.llamaFree(llamaOpaqueContext);
-      LlamaCpp.llamaFreeModel(llamaOpaqueModel);
+      LlamaCpp.llamaFreeModel(llamaModel);
       LlamaCpp.llamaBackendFree();
       LlamaCpp.closeLibrary();
     } catch (RuntimeException e) {
@@ -122,7 +122,7 @@ public class Main {
   private static int[] tokenize(final String text, boolean addBos) {
     final int maxLength = text.length();
     final int[] temp = new int[maxLength];
-    int length = LlamaCpp.llamaTokenize(llamaOpaqueModel, text.getBytes(StandardCharsets.UTF_8), temp, maxLength, addBos);
+    int length = LlamaCpp.llamaTokenize(llamaModel, text.getBytes(StandardCharsets.UTF_8), temp, maxLength, addBos);
     final int[] ret = new int[length];
     System.arraycopy(temp, 0, ret, 0, length);
     return ret;
