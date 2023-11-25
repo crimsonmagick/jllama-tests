@@ -23,8 +23,8 @@ dependencies {
 //    implementation 'net.jllama:jni-implementation:0.0.2-SNAPSHOT:os_x_arm64'
 //    implementation 'net.jllama:llama-cpp:0.0.2-SNAPSHOT:os_x_arm64'
 //    // Windows
-//    implementation 'net.jllama:jni-implementation:0.0.1-SNAPSHOT:windows_x64'
-//    implementation 'net.jllama:llama-cpp:0.0.1-SNAPSHOT:windows_x64'
+//    implementation 'net.jllama:jni-implementation:0.0.2-SNAPSHOT:windows_x64'
+//    implementation 'net.jllama:llama-cpp:0.0.2-SNAPSHOT:windows_x64'
     implementation 'org.apache.logging.log4j:log4j-core:2.20.0'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.15.2'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.2'
@@ -44,7 +44,7 @@ task runProgram(type: JavaExec) {
 
     // Uncomment below for using custom builds of jni-implementation and llama-cpp
 
-    final bridgeRelativePath = '/build-cmake/jni-implementation/release'
+    final bridgeRelativePath = '/build-cmake/jni-implementation/debug'
     final bridgeAbsolutePath = projectDir as String + bridgeRelativePath
     systemProperty 'java.library.path', bridgeAbsolutePath
     final llamaRelativePath = '/build-cmake/llama/release'

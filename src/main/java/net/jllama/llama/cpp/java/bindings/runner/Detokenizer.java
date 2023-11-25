@@ -16,14 +16,14 @@ public class Detokenizer {
 
   public String detokenize(int token, LlamaModel llamaModel) {
     byte[] buf = new byte[8];
-    int length = LlamaCpp.llamaTokenToPiece(llamaModel, token, buf);
+    int length = llamaModel.detokenize(token, buf);
     if (length < 0) {
       final int size = Math.abs(length);
       buf = new byte[size];
-      length = LlamaCpp.llamaTokenToPiece(llamaModel, token, buf);
+      length = llamaModel.detokenize(token, buf);
     }
     if (length < 0) {
-      throw new RuntimeException("Unable to allocate a large enough buffer for detokenization length.");
+      throw new RuntimeException("Unable to allocate a large enough buffer for detokenized string length.");
     }
     return new String(buf, 0, length, StandardCharsets.UTF_8);
   }
