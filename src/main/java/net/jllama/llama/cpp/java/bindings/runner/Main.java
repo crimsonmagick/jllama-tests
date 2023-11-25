@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 import net.jllama.llama.cpp.java.bindings.LlamaContextParams;
 import net.jllama.llama.cpp.java.bindings.LlamaCpp;
-import net.jllama.llama.cpp.java.bindings.LlamaCppManager;
 import net.jllama.llama.cpp.java.bindings.LlamaLogLevel;
 import net.jllama.llama.cpp.java.bindings.LlamaModelParams;
 import net.jllama.llama.cpp.java.bindings.LlamaContext;
@@ -34,19 +33,17 @@ public class Main {
     System.out.printf("pid=%s%n", pid);
   }
   private static volatile String appLogLevel = System.getProperty("loglevel");
-  private static LlamaCpp llamaCpp;
   private static LlamaOpaqueModel llamaOpaqueModel;
   private static LlamaContext llamaOpaqueContext;
 
   public static void main(final String[] args) {
     try {
-      llamaCpp = LlamaCppManager.getLlamaCpp();
-      final Detokenizer detokenizer = new Detokenizer(llamaCpp);
+      final Detokenizer detokenizer = new Detokenizer();
       final String modelPath = System.getProperty("modelpath");
-      llamaCpp.loadLibrary();
-      llamaCpp.llamaBackendInit(true);
-      llamaCpp.llamaLogSet((logLevel, message) -> {
-        final Logger log = LogManager.getLogger(llamaCpp.getClass());
+      LlamaCpp.loadLibrary();
+      LlamaCpp.llamaBackendInit(true);
+      LlamaCpp.llamaLogSet((logLevel, message) -> {
+        final Logger log = LogManager.getLogger(LlamaCpp.class);
         final String messageText = new String(message, StandardCharsets.UTF_8);
         if ("OFF".equalsIgnoreCase(appLogLevel)) {
           return;
@@ -59,20 +56,20 @@ public class Main {
           log.error(messageText);
         }
       });
-      long timestamp1 = llamaCpp.llamaTimeUs();
+      long timestamp1 = LlamaCpp.llamaTimeUs();
 
-      final LlamaContextParams llamaContextParams = llamaCpp.llamaContextDefaultParams();
+      final LlamaContextParams llamaContextParams = LlamaCpp.llamaContextDefaultParams();
       final int threads = Runtime.getRuntime().availableProcessors() / 2 - 1;
       llamaContextParams.setnThreads(threads);
       llamaContextParams.setnThreadsBatch(threads);
 
-      final LlamaModelParams llamaModelParams = llamaCpp.llamaModelDefaultParams();
-      llamaOpaqueModel = llamaCpp.llamaLoadModelFromFile(
+      final LlamaModelParams llamaModelParams = LlamaCpp.llamaModelDefaultParams();
+      llamaOpaqueModel = LlamaCpp.llamaLoadModelFromFile(
           modelPath.getBytes(StandardCharsets.UTF_8), llamaModelParams);
       llamaOpaqueContext =
-          llamaCpp.llamaNewContextWithModel(llamaOpaqueModel, llamaContextParams);
+          LlamaCpp.llamaNewContextWithModel(llamaOpaqueModel, llamaContextParams);
 
-      long timestamp2 = llamaCpp.llamaTimeUs();
+      long timestamp2 = LlamaCpp.llamaTimeUs();
 
       System.out.printf("timestamp1=%s, timestamp2=%s, initialization time=%s%n", timestamp1, timestamp2, timestamp2 - timestamp1);
 
@@ -81,42 +78,42 @@ public class Main {
 
       System.out.print(detokenizer.detokenize(toList(tokens), llamaOpaqueModel));
 
-      llamaCpp.llamaEval(llamaOpaqueContext, tokens, tokens.length, 0);
-      float[] logits = llamaCpp.llamaGetLogits(llamaOpaqueContext);
+      LlamaCpp.llamaEval(llamaOpaqueContext, tokens, tokens.length, 0);
+      float[] logits = LlamaCpp.llamaGetLogits(llamaOpaqueContext);
       LlamaTokenDataArray candidates = LlamaTokenDataArray.logitsToTokenDataArray(logits);
       final float temp = 0.35f;
-      llamaCpp.llamaSampleTemperature(llamaOpaqueContext, candidates, temp);
-      int previousToken = llamaCpp.llamaSampleToken(llamaOpaqueContext, candidates);
+      LlamaCpp.llamaSampleTemperature(llamaOpaqueContext, candidates, temp);
+      int previousToken = LlamaCpp.llamaSampleToken(llamaOpaqueContext, candidates);
 
       System.out.print(detokenizer.detokenize(previousToken, llamaOpaqueModel));
 
       final List<Integer> previousTokenList = new ArrayList<>();
       previousTokenList.add(previousToken);
 
-      for (int i = tokens.length + 1; previousToken != llamaCpp.llamaTokenEos(llamaOpaqueContext) && i < llamaContextParams.getnCtx(); i++) {
-        final int res = llamaCpp.llamaEval(llamaOpaqueContext, new int[]{previousToken}, 1, i);
+      for (int i = tokens.length + 1; previousToken != LlamaCpp.llamaTokenEos(llamaOpaqueContext) && i < llamaContextParams.getnCtx(); i++) {
+        final int res = LlamaCpp.llamaEval(llamaOpaqueContext, new int[]{previousToken}, 1, i);
         if (res != 0) {
           throw new RuntimeException("Non zero response from eval");
         }
-        logits = llamaCpp.llamaGetLogits(llamaOpaqueContext);
+        logits = LlamaCpp.llamaGetLogits(llamaOpaqueContext);
         candidates = LlamaTokenDataArray.logitsToTokenDataArray(logits);
-//        llamaCpp.llamaSampleRepetitionPenalty(llamaOpaqueContext, candidates, toArray(previousTokenList), 1.2f);
-//        llamaCpp.llamaSampleFrequencyAndPresencePenalties(llamaOpaqueContext, candidates, toArray(previousTokenList), -0.2f, -0.2f);
-//        llamaCpp.llamaSampleTopK(llamaOpaqueContext, candidates, 100, 1);
-//        llamaCpp.llamaSampleSoftMax(llamaOpaqueContext, candidates);
-//        llamaCpp.llamaSampleTopP(llamaOpaqueContext, candidates, 0.001f, 1);
-//        llamaCpp.llamaSampleTailFree(llamaOpaqueContext, candidates, 0.5f, 1);
-//        llamaCpp.llamaSampleTypical(llamaOpaqueContext, candidates, 0.5f, 1);
-        llamaCpp.llamaSampleTemperature(llamaOpaqueContext, candidates, temp);
-        previousToken = llamaCpp.llamaSampleToken(llamaOpaqueContext, candidates);
+//        LlamaCpp.llamaSampleRepetitionPenalty(llamaOpaqueContext, candidates, toArray(previousTokenList), 1.2f);
+//        LlamaCpp.llamaSampleFrequencyAndPresencePenalties(llamaOpaqueContext, candidates, toArray(previousTokenList), -0.2f, -0.2f);
+//        LlamaCpp.llamaSampleTopK(llamaOpaqueContext, candidates, 100, 1);
+//        LlamaCpp.llamaSampleSoftMax(llamaOpaqueContext, candidates);
+//        LlamaCpp.llamaSampleTopP(llamaOpaqueContext, candidates, 0.001f, 1);
+//        LlamaCpp.llamaSampleTailFree(llamaOpaqueContext, candidates, 0.5f, 1);
+//        LlamaCpp.llamaSampleTypical(llamaOpaqueContext, candidates, 0.5f, 1);
+        LlamaCpp.llamaSampleTemperature(llamaOpaqueContext, candidates, temp);
+        previousToken = LlamaCpp.llamaSampleToken(llamaOpaqueContext, candidates);
         previousTokenList.add(previousToken);
         System.out.print(detokenizer.detokenize(previousToken, llamaOpaqueModel));
       }
 
-      llamaCpp.llamaFree(llamaOpaqueContext);
-      llamaCpp.llamaFreeModel(llamaOpaqueModel);
-      llamaCpp.llamaBackendFree();
-      llamaCpp.closeLibrary();
+      LlamaCpp.llamaFree(llamaOpaqueContext);
+      LlamaCpp.llamaFreeModel(llamaOpaqueModel);
+      LlamaCpp.llamaBackendFree();
+      LlamaCpp.closeLibrary();
     } catch (RuntimeException e) {
       System.out.println("Fatal exception occurred, exceptionMessage=" + e.getMessage());
     }
@@ -125,7 +122,7 @@ public class Main {
   private static int[] tokenize(final String text, boolean addBos) {
     final int maxLength = text.length();
     final int[] temp = new int[maxLength];
-    int length = llamaCpp.llamaTokenize(llamaOpaqueModel, text.getBytes(StandardCharsets.UTF_8), temp, maxLength, addBos);
+    int length = LlamaCpp.llamaTokenize(llamaOpaqueModel, text.getBytes(StandardCharsets.UTF_8), temp, maxLength, addBos);
     final int[] ret = new int[length];
     System.arraycopy(temp, 0, ret, 0, length);
     return ret;
