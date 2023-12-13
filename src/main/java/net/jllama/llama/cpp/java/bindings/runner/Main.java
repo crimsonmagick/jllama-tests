@@ -118,7 +118,7 @@ public class Main {
       llamaModel.close();
       LlamaCpp.llamaBackendFree();
       LlamaCpp.closeLibrary();
-      System.out.println("genTokenCount=" + previousTokenList.size());
+      System.out.println("\ngenTokenCount=" + previousTokenList.size());
     } catch (RuntimeException e) {
       System.out.println("Fatal exception occurred, exceptionMessage=" + e.getMessage());
     }
