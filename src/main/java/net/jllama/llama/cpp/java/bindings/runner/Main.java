@@ -21,7 +21,11 @@ import java.nio.charset.StandardCharsets;
 
 public class Main {
 
-  private static final String SYSTEM_PROMPT = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible. If you don't know something, answer that you do not know.";
+  private static final String SYSTEM_PROMPT = "You are a helpful, respectful and honest assistant, "
+    + "specializing in code generation. Always answer as helpfully as possible. "
+    + "If you don't know something, answer that you do not know.";
+
+  private static final String INSTRUCT_PROMPT = "Write \"Hello World\" in C.";
   private static final String COMPLETION_PROMPT = "I love my Cat Winnie, he is such a great cat! Let me tell you more about ";
 
   private static final String B_INST = "<s>[INST]";
@@ -69,13 +73,13 @@ public class Main {
       final LlamaModelParams llamaModelParams = LlamaModel.llamaModelDefaultParams();
       llamaModel = LlamaCpp.loadModel(modelPath.getBytes(StandardCharsets.UTF_8), llamaModelParams);
       llamaContext = llamaModel.createContext(llamaContextParams);
-      final int eosToken = llamaModel.llamaTokenEos(); //tokenize("</s>", false)[0];
+      final int eosToken = llamaModel.llamaTokenEos();
 
       long timestamp2 = LlamaCpp.llamaTimeUs();
 
       System.out.printf("timestamp1=%s, timestamp2=%s, initialization time=%s%n", timestamp1, timestamp2, timestamp2 - timestamp1);
 
-      final String prompt = B_INST + B_SYS + SYSTEM_PROMPT + E_SYS + "Write \"Hello World\" in C." + E_INST;
+      final String prompt = B_INST + B_SYS + SYSTEM_PROMPT + E_SYS + INSTRUCT_PROMPT + E_INST;
       final int[] tokens = tokenize(prompt, true);
 
       final LlamaBatch batch = llamaContext.createBatch(1000);
@@ -114,6 +118,7 @@ public class Main {
       llamaModel.close();
       LlamaCpp.llamaBackendFree();
       LlamaCpp.closeLibrary();
+      System.out.println("genTokenCount=" + previousTokenList.size());
     } catch (RuntimeException e) {
       System.out.println("Fatal exception occurred, exceptionMessage=" + e.getMessage());
     }
