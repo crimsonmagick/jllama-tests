@@ -15,17 +15,17 @@ repositories {
 }
 
 ext {
-  jLlamaVersion = '0.0.3-SNAPSHOT'
+  jLlamaVersion = '0.0.5-SNAPSHOT'
 }
 
 dependencies {
     implementation "net.jllama:jni-bindings:${jLlamaVersion}"
     // Linux
-    implementation "net.jllama:jni-implementation:${jLlamaVersion}:linux_x64"
-    implementation "net.jllama:llama-cpp:${jLlamaVersion}:linux_x64"
-    // Mac
-    implementation "net.jllama:jni-implementation:${jLlamaVersion}:os_x_arm64"
-    implementation "net.jllama:llama-cpp:${jLlamaVersion}:os_x_arm64"
+//    implementation "net.jllama:jni-implementation:${jLlamaVersion}:linux_x64"
+//    implementation "net.jllama:llama-cpp:${jLlamaVersion}:linux_x64"
+//    // Mac
+//    implementation "net.jllama:jni-implementation:${jLlamaVersion}:os_x_arm64"
+//    implementation "net.jllama:llama-cpp:${jLlamaVersion}:os_x_arm64"
     // Windows
     implementation "net.jllama:jni-implementation:${jLlamaVersion}:windows_x64"
     implementation "net.jllama:llama-cpp:${jLlamaVersion}:windows_x64"

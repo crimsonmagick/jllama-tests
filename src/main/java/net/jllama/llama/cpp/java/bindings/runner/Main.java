@@ -21,12 +21,15 @@ import java.nio.charset.StandardCharsets;
 
 public class Main {
 
-  private static final String SYSTEM_PROMPT = "You are a helpful, respectful and honest assistant, "
+  private static final String CHAT_SYSTEM_PROMPT = "You are a helpful, respectful and honest assistant, "
     + "specializing in code generation. Always answer as helpfully as possible. "
     + "If you don't know something, answer that you do not know.";
 
-  private static final String INSTRUCT_PROMPT = "Write \"Hello World\" in C.";
+  private static final String CHAT_PROMPT = "Write \"Hello World\" in C.";
   private static final String COMPLETION_PROMPT = "I love my Cat Winnie, he is such a great cat! Let me tell you more about ";
+  private static final String INSTRUCT_SYSTEM_PROMPT = "Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n### Instruction:\n%s\n\n### Response:";
+  private static final String INSTRUCT_PROMPT = "What is attention mechanism of a transformer model? \n"
+    + " Write a python code to illustrate how attention works within a transformer model using numpy library. Do not use pytorch or tensorflow.";
 
   private static final String B_INST = "<s>[INST]";
   private static final String E_INST = "[/INST]";
@@ -79,7 +82,9 @@ public class Main {
 
       System.out.printf("timestamp1=%s, timestamp2=%s, initialization time=%s%n", timestamp1, timestamp2, timestamp2 - timestamp1);
 
-      final String prompt = B_INST + B_SYS + SYSTEM_PROMPT + E_SYS + INSTRUCT_PROMPT + E_INST;
+      // chat prompt
+//      final String prompt = B_INST + B_SYS + CHAT_SYSTEM_PROMPT + E_SYS + CHAT_PROMPT + E_INST;
+      final String prompt = String.format(INSTRUCT_SYSTEM_PROMPT, INSTRUCT_PROMPT);
       final int[] tokens = tokenize(prompt, true);
 
       final LlamaBatch batch = llamaContext.createBatch(1000);
@@ -119,8 +124,8 @@ public class Main {
       LlamaCpp.llamaBackendFree();
       LlamaCpp.closeLibrary();
       System.out.println("\ngenTokenCount=" + previousTokenList.size());
-    } catch (RuntimeException e) {
-      System.out.println("Fatal exception occurred, exceptionMessage=" + e.getMessage());
+    } catch (Error e) {
+      System.out.println("Fatal error occurred, errorMessage=" + e.getMessage());
     }
   }
 
