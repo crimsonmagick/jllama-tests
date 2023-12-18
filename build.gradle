@@ -15,7 +15,7 @@ repositories {
 }
 
 ext {
-  jLlamaVersion = '0.0.5-SNAPSHOT'
+  jLlamaVersion = '0.0.10-SNAPSHOT'
 }
 
 dependencies {
