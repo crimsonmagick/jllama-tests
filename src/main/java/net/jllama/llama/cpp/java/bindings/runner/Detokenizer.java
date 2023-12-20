@@ -1,10 +1,10 @@
 package net.jllama.llama.cpp.java.bindings.runner;
 
-import net.jllama.llama.cpp.java.bindings.LlamaCpp;
+import net.jllama.core.LlamaCpp;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
-import net.jllama.llama.cpp.java.bindings.LlamaModel;
+import net.jllama.core.LlamaModel;
 
 public class Detokenizer {
 
