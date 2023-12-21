@@ -4,17 +4,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import net.jllama.api.Llama;
+import net.jllama.api.Model;
 import net.jllama.core.LlamaContext.LlamaBatch;
 import net.jllama.core.LlamaContextParams;
 import net.jllama.core.LlamaCpp;
-import net.jllama.core.LlamaLogLevel;
-import net.jllama.core.LlamaModelParams;
 import net.jllama.core.LlamaContext;
 import net.jllama.core.LlamaModel;
 import net.jllama.core.LlamaTokenDataArray;
 import net.jllama.core.Sequence;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
@@ -28,8 +26,7 @@ public class Main {
   private static final String CHAT_PROMPT = "Write \"Hello World\" in C.";
   private static final String COMPLETION_PROMPT = "I love my Cat Winnie, he is such a great cat! Let me tell you more about ";
   private static final String INSTRUCT_SYSTEM_PROMPT = "Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n### Instruction:\n%s\n\n### Response:";
-  private static final String INSTRUCT_PROMPT = "What is attention mechanism of a transformer model? \n"
-    + " Write a python code to illustrate how attention works within a transformer model using numpy library. Do not use pytorch or tensorflow.";
+  private static final String INSTRUCT_PROMPT = "Write a hashtable implementation in Java. Do not use `HashMap`, `Map`, or `HashTable` in the implementation. DO NOT IMPORT THOSE CLASSES. This class should be written from \"scratch\". The key should be a String, and the value an Object. The implementation should handle collisions.";
 
   private static final String B_INST = "<s>[INST]";
   private static final String E_INST = "[/INST]";
@@ -41,41 +38,26 @@ public class Main {
     final String pid = jvmName.split("@")[0];
     System.out.printf("pid=%s%n", pid);
   }
-  private static volatile String appLogLevel = System.getProperty("loglevel");
-  private static LlamaModel llamaModel;
-  private static LlamaContext llamaContext;
 
   public static void main(final String[] args) {
     try {
       final Detokenizer detokenizer = new Detokenizer();
       final String modelPath = System.getProperty("modelpath");
-      LlamaCpp.loadLibrary();
-      LlamaCpp.llamaBackendInit(true);
-      LlamaCpp.llamaLogSet((logLevel, message) -> {
-        final Logger log = LogManager.getLogger(LlamaCpp.class);
-        final String messageText = new String(message, StandardCharsets.UTF_8);
-        if ("OFF".equalsIgnoreCase(appLogLevel)) {
-          return;
-        }
-        if (logLevel == LlamaLogLevel.INFO && "INFO".equalsIgnoreCase(appLogLevel)) {
-          log.info(messageText);
-        } else if (logLevel == LlamaLogLevel.WARN) {
-          log.warn(messageText);
-        } else {
-          log.error(messageText);
-        }
-      });
+      final Llama llamaApi = Llama.library();
       long timestamp1 = LlamaCpp.llamaTimeUs();
 
       final LlamaContextParams llamaContextParams = LlamaContext.llamaContextDefaultParams();
       final int threads = Runtime.getRuntime().availableProcessors() / 2 - 1;
       llamaContextParams.setnThreads(threads);
       llamaContextParams.setnThreadsBatch(threads);
-      llamaContextParams.setnCtx(500);
+      llamaContextParams.setnCtx(3500);
 
-      final LlamaModelParams llamaModelParams = LlamaModel.llamaModelDefaultParams();
-      llamaModel = LlamaCpp.loadModel(modelPath.getBytes(StandardCharsets.UTF_8), llamaModelParams);
-      llamaContext = llamaModel.createContext(llamaContextParams);
+      final Model model = llamaApi.newModel()
+          .withDefaults()
+          .path(modelPath)
+          .load();
+      final LlamaModel llamaModel = model.getLlamaModel();
+      final LlamaContext llamaContext = llamaModel.createContext(llamaContextParams);
       final int eosToken = llamaModel.llamaTokenEos();
 
       long timestamp2 = LlamaCpp.llamaTimeUs();
@@ -83,12 +65,12 @@ public class Main {
       System.out.printf("timestamp1=%s, timestamp2=%s, initialization time=%s%n", timestamp1, timestamp2, timestamp2 - timestamp1);
 
       // chat prompt
-//      final String prompt = B_INST + B_SYS + CHAT_SYSTEM_PROMPT + E_SYS + CHAT_PROMPT + E_INST;
-      final String prompt = String.format(INSTRUCT_SYSTEM_PROMPT, INSTRUCT_PROMPT);
-      final int[] tokens = tokenize(prompt, true);
+      final String prompt = B_INST + B_SYS + INSTRUCT_PROMPT + E_SYS + CHAT_PROMPT + E_INST;
+//      final String prompt = String.format(INSTRUCT_SYSTEM_PROMPT, INSTRUCT_PROMPT);
+      final int[] tokens = tokenize(llamaModel, prompt, true);
 
       final LlamaBatch batch = llamaContext.createBatch(1000);
-      final Sequence sequence = batch.submitSequence(tokens);
+      final Sequence sequence = batch.submitSequenceOld(tokens);
 
       System.out.print(detokenizer.detokenize(toList(tokens), llamaModel));
 
@@ -129,7 +111,7 @@ public class Main {
     }
   }
 
-  private static int[] tokenize(final String text, boolean addBos) {
+  private static int[] tokenize(final LlamaModel llamaModel, final String text, boolean addBos) {
     final int maxLength = text.length();
     final int[] temp = new int[maxLength];
     int length = llamaModel.tokenize(text.getBytes(StandardCharsets.UTF_8), temp, maxLength, addBos);
