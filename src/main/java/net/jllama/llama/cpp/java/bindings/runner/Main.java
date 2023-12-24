@@ -4,9 +4,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import net.jllama.api.Context;
 import net.jllama.api.Llama;
 import net.jllama.api.Model;
 import net.jllama.core.LlamaContext.LlamaBatch;
+import net.jllama.core.LlamaContext.LlamaBatchOld;
 import net.jllama.core.LlamaContextParams;
 import net.jllama.core.LlamaCpp;
 import net.jllama.core.LlamaContext;
@@ -46,18 +48,20 @@ public class Main {
       final Llama llamaApi = Llama.library();
       long timestamp1 = LlamaCpp.llamaTimeUs();
 
-      final LlamaContextParams llamaContextParams = LlamaContext.llamaContextDefaultParams();
-      final int threads = Runtime.getRuntime().availableProcessors() / 2 - 1;
-      llamaContextParams.setnThreads(threads);
-      llamaContextParams.setnThreadsBatch(threads);
-      llamaContextParams.setnCtx(3500);
-
       final Model model = llamaApi.newModel()
           .withDefaults()
           .path(modelPath)
           .load();
+      final int threads = Runtime.getRuntime().availableProcessors() / 2 - 1;
+      final int contextSize = 3500;
+      final Context context = model.newContext()
+          .withDefaults()
+          .setnThreads(threads)
+          .setnThreadsBatch(threads)
+          .setnCtx(contextSize)
+          .create();
+      final LlamaContext llamaContext = context.getLlamaContext();
       final LlamaModel llamaModel = model.getLlamaModel();
-      final LlamaContext llamaContext = llamaModel.createContext(llamaContextParams);
       final int eosToken = llamaModel.llamaTokenEos();
 
       long timestamp2 = LlamaCpp.llamaTimeUs();
@@ -69,7 +73,8 @@ public class Main {
 //      final String prompt = String.format(INSTRUCT_SYSTEM_PROMPT, INSTRUCT_PROMPT);
       final int[] tokens = tokenize(llamaModel, prompt, true);
 
-      final LlamaBatch batch = llamaContext.createBatch(1000);
+      final LlamaBatchOld batch = llamaContext.llamaBatchInitOld(1000, 0, 1);
+      final LlamaBatch neoBatch = context.getLlamaContext().llamaBatchInit(1000, 0, 1);
       final Sequence sequence = batch.submitSequenceOld(tokens);
 
       System.out.print(detokenizer.detokenize(toList(tokens), llamaModel));
@@ -87,7 +92,7 @@ public class Main {
       previousTokenList.add(previousToken);
 
 
-      for (int i = tokens.length + 1; previousToken != eosToken && i < llamaContextParams.getnCtx(); i++) {
+      for (int i = tokens.length + 1; previousToken != eosToken && i < contextSize; i++) {
         batch.appendToSequence(new int[]{previousToken}, sequence);
         llamaContext.evaluate(batch);
         logits = llamaContext.getLogits(sequence);
