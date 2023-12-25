@@ -18,6 +18,7 @@ import net.jllama.core.Sequence;
 
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
+import net.jllama.core.exceptions.LlamaCppException;
 
 public class Main {
 
@@ -69,22 +70,37 @@ public class Main {
       System.out.printf("timestamp1=%s, timestamp2=%s, initialization time=%s%n", timestamp1, timestamp2, timestamp2 - timestamp1);
 
       // chat prompt
-      final String prompt = B_INST + B_SYS + INSTRUCT_PROMPT + E_SYS + CHAT_PROMPT + E_INST;
+      final String prompt = B_INST + B_SYS + CHAT_SYSTEM_PROMPT + E_SYS + INSTRUCT_PROMPT + E_INST;
 //      final String prompt = String.format(INSTRUCT_SYSTEM_PROMPT, INSTRUCT_PROMPT);
       final int[] tokens = tokenize(llamaModel, prompt, true);
 
-      final LlamaBatchOld batch = llamaContext.llamaBatchInitOld(1000, 0, 1);
+//      final LlamaBatchOld batch = llamaContext.llamaBatchInitOld(1000, 0, 1);
       final LlamaBatch neoBatch = context.getLlamaContext().llamaBatchInit(1000, 0, 1);
-      final Sequence sequence = batch.submitSequenceOld(tokens);
+//      final Sequence sequence = batch.submitSequenceOld(tokens);
 
       System.out.print(detokenizer.detokenize(toList(tokens), llamaModel));
 
-      llamaContext.evaluate(batch);
-      float[] logits = llamaContext.getLogits(sequence);
+//      llamaContext.evaluate(batch);
+      int pos = 0;
+      neoBatch.nTokens = tokens.length;
+      for (; pos < tokens.length; pos++) {
+        neoBatch.token[pos] = tokens[pos];
+        neoBatch.pos[pos] = pos;
+        neoBatch.nSeqId[pos] = 1;
+        neoBatch.seqId[pos][0] = 0;
+        neoBatch.logits[pos] = 0;
+      }
+      neoBatch.logits[tokens.length - 1] = 1;
+      final int initialRet = llamaContext.llamaDecode(neoBatch);
+      if (initialRet != 0) {
+        throw new LlamaCppException("decode failed with ret=" + initialRet);
+      }
+      float[] logits = llamaContext.llamaGetLogitsIth(tokens.length - 1);
       LlamaTokenDataArray candidates = LlamaTokenDataArray.logitsToTokenDataArray(logits);
       llamaContext.llamaSampleTopK(candidates, 40, 1);
       llamaContext.llamaSampleTopP(candidates, 0.9f, 1);
-      llamaContext.llamaSampleTemperature(candidates, 0.4f);      int previousToken = llamaContext.llamaSampleToken(candidates);
+      llamaContext.llamaSampleTemperature(candidates, 0.4f);
+      int previousToken = llamaContext.llamaSampleToken(candidates);
 
       System.out.print(detokenizer.detokenize(previousToken, llamaModel));
 
@@ -92,10 +108,19 @@ public class Main {
       previousTokenList.add(previousToken);
 
 
+      neoBatch.nTokens = 1;
+      neoBatch.nSeqId[0] = 1;
+      neoBatch.seqId[0][0] = 0;
+      neoBatch.logits[0] = 1;
       for (int i = tokens.length + 1; previousToken != eosToken && i < contextSize; i++) {
-        batch.appendToSequence(new int[]{previousToken}, sequence);
-        llamaContext.evaluate(batch);
-        logits = llamaContext.getLogits(sequence);
+        neoBatch.token[0] = previousToken;
+        neoBatch.pos[0] = pos++;
+//        batch.appendToSequence(new int[]{previousToken}, sequence);
+        final int ret = llamaContext.llamaDecode(neoBatch);
+        if (ret != 0) {
+          throw new LlamaCppException("decode failed with ret=" + ret);
+        }
+        logits = llamaContext.llamaGetLogitsIth(0);
         candidates = LlamaTokenDataArray.logitsToTokenDataArray(logits);
         llamaContext.llamaSampleTopK(candidates, 40, 1);
         llamaContext.llamaSampleTopP(candidates, 0.9f, 1);
@@ -105,7 +130,7 @@ public class Main {
         System.out.print(detokenizer.detokenize(previousToken, llamaModel));
       }
 
-      batch.close();
+      neoBatch.llamaBatchFree();
       llamaContext.close();
       llamaModel.close();
       LlamaCpp.llamaBackendFree();
