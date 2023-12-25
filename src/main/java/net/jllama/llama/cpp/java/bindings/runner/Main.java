@@ -8,13 +8,10 @@ import net.jllama.api.Context;
 import net.jllama.api.Llama;
 import net.jllama.api.Model;
 import net.jllama.core.LlamaContext.LlamaBatch;
-import net.jllama.core.LlamaContext.LlamaBatchOld;
-import net.jllama.core.LlamaContextParams;
 import net.jllama.core.LlamaCpp;
 import net.jllama.core.LlamaContext;
 import net.jllama.core.LlamaModel;
 import net.jllama.core.LlamaTokenDataArray;
-import net.jllama.core.Sequence;
 
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
