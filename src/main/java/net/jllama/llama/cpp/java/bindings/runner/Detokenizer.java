@@ -1,6 +1,5 @@
 package net.jllama.llama.cpp.java.bindings.runner;
 
-import net.jllama.core.LlamaCpp;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
