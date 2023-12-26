@@ -54,9 +54,9 @@ public class Main {
       final int contextSize = 3500;
       final Context context = model.newContext()
           .withDefaults()
-          .setnThreads(threads)
-          .setnThreadsBatch(threads)
-          .setnCtx(contextSize)
+          .nThreads(threads)
+          .nThreadsBatch(threads)
+          .nCtx(contextSize)
           .create();
       final LlamaContext llamaContext = context.getLlamaContext();
       final LlamaModel llamaModel = model.getLlamaModel();
