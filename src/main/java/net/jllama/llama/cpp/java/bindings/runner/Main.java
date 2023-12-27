@@ -1,26 +1,10 @@
 package net.jllama.llama.cpp.java.bindings.runner;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
-import net.jllama.api.Context;
-import net.jllama.api.Llama;
-import net.jllama.api.Model;
-import net.jllama.core.LlamaContext.LlamaBatch;
-import net.jllama.core.LlamaCpp;
-import net.jllama.core.LlamaContext;
-import net.jllama.core.LlamaModel;
-import net.jllama.core.LlamaTokenDataArray;
-
 import java.lang.management.ManagementFactory;
-import java.nio.charset.StandardCharsets;
-import net.jllama.core.exceptions.LlamaCppException;
 
 public class Main {
 
-  private static final String CHAT_SYSTEM_PROMPT = "You are a helpful, respectful and honest general-purpose assistant, "
-    + "that also specializes in code generation. Always answer as helpfully as possible. "
+  private static final String CHAT_SYSTEM_PROMPT = "You are an honest general-purpose assistant. Always answer as helpfully as possible. Be as short and to the point as possible."
     + "If you don't know something, answer that you do not know.";
 
   private static final String CHAT_PROMPT = "Write \"Hello World\" in C.";
@@ -42,9 +26,11 @@ public class Main {
 
   public static void main(final String[] args) {
     try {
-      final Evaluator evaluator = new Evaluator();
-//      final String prompt1 = "Write a hashtable implementation in Java. Do not use `HashMap`, `Map`, or `HashTable` in the implementation. DO NOT IMPORT THOSE CLASSES. This class should be written from \"scratch\". The key should be a String, and the value an Object. The implementation should handle collisions.";
-      final String prompt1 = "Write an example Spring Controller in Java.";
+      final String piratePrompt =  "Let's role-play. You are a pirate on a desserted island, looking for treasure. Unfortunately, you've been stranded. You specifically do not know how to program and write code - it's been your greatest weakness since birth, the shame from which has driven you to a life of piracy.";
+      final Evaluator evaluator = new Evaluator(systemPrompt(piratePrompt));
+      final String prompt1 = "Write a hashtable implementation in Java. Do not use `HashMap`, `Map`, or `HashTable` in the implementation. DO NOT IMPORT THOSE CLASSES. This class should be written from \"scratch\". The key should be a String, and the value an Object. The implementation should handle collisions.";
+//      final String prompt1 = "Write an example Spring Controller in Java.";
+//      final String prompt1 = "Why are chipmunks loud?";
       evaluator.evaluate(chatPrompt(prompt1));
       System.out.println("------------------------------------------------");
       System.out.println("------------------------------------------------");
@@ -58,7 +44,13 @@ public class Main {
   }
 
   private static String chatPrompt(final String prompt) {
-    return B_INST + B_SYS + CHAT_SYSTEM_PROMPT + E_SYS + prompt + E_INST;
+   return prompt + E_INST;
   }
 
+  private static String systemPrompt() {
+    return systemPrompt(CHAT_SYSTEM_PROMPT);
+  }
+  private static String systemPrompt(final String systemPrompt) {
+    return B_INST + B_SYS + systemPrompt + E_SYS;
+  }
 }

@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import net.jllama.api.Context;
 import net.jllama.api.Llama;
@@ -27,9 +28,10 @@ public class Evaluator implements Closeable {
   private final int contextSize;
   private final Context context;
   private final LlamaBatch batch;
+  private final int systemPromptLength;
   private int nextSeqId;
 
-  Evaluator() {
+  Evaluator(final String initialPrompt) {
     final String modelPath = System.getProperty("modelpath");
     llamaApi = Llama.library();
     detokenizer = new Detokenizer();
@@ -45,47 +47,57 @@ public class Evaluator implements Closeable {
         .nThreads(threads)
         .nThreadsBatch(threads)
         .nCtx(contextSize)
+        .seed(ThreadLocalRandom.current().nextInt())
         .create();
     llamaContext = context.getLlamaContext();
     llamaModel = model.getLlamaModel();
     eosToken = llamaModel.llamaTokenEos();
     nextSeqId = 0;
     batch = context.getLlamaContext().llamaBatchInit(1000, 0, 1);
-  }
-
-  public void evaluate(final String prompt) {
-    final int[] tokens = tokenize(llamaModel, prompt, true);
-
-
-    System.out.print(detokenizer.detokenize(toList(tokens), llamaModel));
-
+    final int[] initialTokens = tokenize(llamaModel, initialPrompt, false);
     final int seqId = nextSeqId++;
-
     int pos = 0;
-    batch.nTokens = tokens.length;
-    for (; pos < tokens.length; pos++) {
-      batch.token[pos] = tokens[pos];
+    batch.nTokens = initialTokens.length;
+    for (; pos < initialTokens.length; pos++) {
+      batch.token[pos] = initialTokens[pos];
       batch.pos[pos] = pos;
       batch.nSeqId[pos] = 1;
       batch.seqId[pos][0] = seqId;
       batch.logits[pos] = 0;
     }
-    batch.logits[tokens.length - 1] = 1;
-    final int initialRet = llamaContext.llamaDecode(batch);
-    if (initialRet != 0) {
-      throw new LlamaCppException("decode failed with ret=" + initialRet);
+    int ret = llamaContext.llamaDecode(batch);
+    if (ret != 0) {
+      throw new LlamaCppException("Initial decode failed with ret=" + ret);
     }
-    float[] logits = llamaContext.llamaGetLogitsIth(tokens.length - 1);
-    LlamaTokenDataArray candidates = LlamaTokenDataArray.logitsToTokenDataArray(logits);
-    llamaContext.llamaSampleTopK(candidates, 40, 1);
-    llamaContext.llamaSampleTopP(candidates, 0.9f, 1);
-    llamaContext.llamaSampleTemperature(candidates, 0.4f);
-    int previousToken = llamaContext.llamaSampleToken(candidates);
+    systemPromptLength = pos;
+  }
+
+  public void evaluate(final String prompt) {
+    final int[] tokens = tokenize(llamaModel, prompt, false);
+
+    // initial prompt
+    System.out.print(detokenizer.detokenize(toList(tokens), llamaModel));
+
+    final int seqId = nextSeqId++;
+    llamaContext.llamaKvCacheSeqCp(0, seqId, 0, systemPromptLength - 1);
+    int pos = systemPromptLength;
+    batch.nTokens = tokens.length;
+    for (int i = 0; i < tokens.length; i++) {
+      batch.token[i] = tokens[i];
+      batch.pos[i] = pos;
+      batch.nSeqId[i] = 1;
+      batch.seqId[i][0] = seqId;
+      batch.logits[i] = 0;
+      pos++;
+    }
+    batch.logits[tokens.length - 1] = 1;
+    decode();
+    int previousToken = sample(llamaContext.llamaGetLogitsIth(tokens.length - 1));
 
     System.out.print(detokenizer.detokenize(previousToken, llamaModel));
 
-    final List<Integer> previousTokenList = new ArrayList<>();
-    previousTokenList.add(previousToken);
+    final List<Integer> previousTokens = new ArrayList<>();
+    previousTokens.add(previousToken);
 
     batch.nTokens = 1;
     batch.nSeqId[0] = 1;
@@ -94,21 +106,11 @@ public class Evaluator implements Closeable {
     for (int i = tokens.length + 1; previousToken != eosToken && i < contextSize; i++) {
       batch.token[0] = previousToken;
       batch.pos[0] = pos++;
-      final int ret = llamaContext.llamaDecode(batch);
-      if (ret != 0) {
-        throw new LlamaCppException("decode failed with ret=" + ret);
-      }
-      logits = llamaContext.llamaGetLogitsIth(0);
-      candidates = LlamaTokenDataArray.logitsToTokenDataArray(logits);
-      llamaContext.llamaSampleTopK(candidates, 40, 1);
-      llamaContext.llamaSampleTopP(candidates, 0.9f, 1);
-      llamaContext.llamaSampleTemperature(candidates, 0.1f);
-      previousToken = llamaContext.llamaSampleToken(candidates);
-      previousTokenList.add(previousToken);
+      decode();
+      previousToken = sample(llamaContext.llamaGetLogitsIth(0));
+      previousTokens.add(previousToken);
       System.out.print(detokenizer.detokenize(previousToken, llamaModel));
     }
-
-    System.out.println("\ngenTokenCount=" + previousTokenList.size());
   }
 
   private static int[] tokenize(final LlamaModel llamaModel, final String text, boolean addBos) {
@@ -118,6 +120,25 @@ public class Evaluator implements Closeable {
     final int[] ret = new int[length];
     System.arraycopy(temp, 0, ret, 0, length);
     return ret;
+  }
+
+  private void decode() {
+    final int decodeResult = llamaContext.llamaDecode(batch);
+    if (decodeResult != 0) {
+      throw new LlamaCppException("decode failed with ret=" + decodeResult);
+    }  }
+
+  private int sample(final float[] logits) {
+    LlamaTokenDataArray candidates = LlamaTokenDataArray.logitsToTokenDataArray(logits);
+//      llamaContext.llamaSampleTopK(candidates, 40, 1);
+//      llamaContext.llamaSampleTopP(candidates, 0.9f, 1);
+//      llamaContext.llamaSampleSoftmax(candidates);
+//    llamaContext.llamaSampleTemp(candidates, 0.1f);
+//    llamaContext.llamaSampleTypical(candidates, 0.1f, 5);
+//    llamaContext.llamaSampleTailFree(candidates, 0.1f, 5);
+    llamaContext.llamaSampleMinP(candidates, 0.1f, 5);
+
+    return llamaContext.llamaSampleToken(candidates);
   }
 
   private static List<Integer> toList(int[] tokens) {
