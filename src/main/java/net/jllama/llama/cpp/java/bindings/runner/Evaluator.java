@@ -92,7 +92,7 @@ public class Evaluator implements Closeable {
     }
     batch.logits[tokens.length - 1] = 1;
     decode();
-    int previousToken = sample(llamaContext.llamaGetLogitsIth(tokens.length - 1));
+    int previousToken = sample(llamaContext.llamaGetLogitsIth(tokens.length - 1), tokens.length);
 
     System.out.print(detokenizer.detokenize(previousToken, llamaModel));
 
@@ -105,11 +105,12 @@ public class Evaluator implements Closeable {
     batch.logits[0] = 1;
     for (int i = tokens.length + 1; previousToken != eosToken && i < contextSize; i++) {
       batch.token[0] = previousToken;
-      batch.pos[0] = pos++;
+      batch.pos[0] = pos;
       decode();
-      previousToken = sample(llamaContext.llamaGetLogitsIth(0));
+      previousToken = sample(llamaContext.llamaGetLogitsIth(0), 1);
       previousTokens.add(previousToken);
       System.out.print(detokenizer.detokenize(previousToken, llamaModel));
+      pos += 1;
     }
   }
 
@@ -128,15 +129,16 @@ public class Evaluator implements Closeable {
       throw new LlamaCppException("decode failed with ret=" + decodeResult);
     }  }
 
-  private int sample(final float[] logits) {
+  private int sample(final float[] logits, final int tokenCount) {
     LlamaTokenDataArray candidates = LlamaTokenDataArray.logitsToTokenDataArray(logits);
-//      llamaContext.llamaSampleTopK(candidates, 40, 1);
+      llamaContext.llamaSampleTopK(candidates, 50, 1);
 //      llamaContext.llamaSampleTopP(candidates, 0.9f, 1);
 //      llamaContext.llamaSampleSoftmax(candidates);
-//    llamaContext.llamaSampleTemp(candidates, 0.1f);
+    llamaContext.llamaSampleTemp(candidates, 1.1f);
 //    llamaContext.llamaSampleTypical(candidates, 0.1f, 5);
 //    llamaContext.llamaSampleTailFree(candidates, 0.1f, 5);
-    llamaContext.llamaSampleMinP(candidates, 0.1f, 5);
+//    llamaContext.llamaSampleMinP(candidates, 0.1f, 5);
+    llamaContext.llamaSampleRepetitionPenalties(candidates, batch.token, tokenCount, 1f, 1.1f, 1.5f);
 
     return llamaContext.llamaSampleToken(candidates);
   }
