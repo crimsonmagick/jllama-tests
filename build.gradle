@@ -48,7 +48,7 @@ task runProgram(type: JavaExec) {
     systemProperty "loglevel", System.getProperty("loglevel")
 
     // Uncomment below for using custom builds of jni-implementation and llama-cpp
-    final jniBuildType = 'debug'
+    final jniBuildType = 'release'
     final llamaCppBuildType = 'release'
     final bridgeRelativePath = "/build-cmake-${jniBuildType}/jni-implementation/${jniBuildType}"
     final bridgeAbsolutePath = projectDir as String + bridgeRelativePath

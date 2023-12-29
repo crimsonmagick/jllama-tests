@@ -1,10 +1,13 @@
 package net.jllama.llama.cpp.java.bindings.runner;
 
 import java.io.Closeable;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import net.jllama.api.Context;
 import net.jllama.api.Llama;
@@ -67,6 +70,7 @@ public class Evaluator implements Closeable {
   }
 
   public void evaluate(final String prompt) {
+    final List<Long> evaluationTimings = new ArrayList<>();
     final int[] tokens = model.tokens().tokenize(prompt);
 
     // initial prompt
@@ -85,7 +89,10 @@ public class Evaluator implements Closeable {
       pos++;
     }
     batch.logits[tokens.length - 1] = 1;
+    long timeStamp1 = System.currentTimeMillis();
     decode();
+    long timeStamp2 = System.currentTimeMillis();
+    evaluationTimings.add(timeStamp2 - timeStamp1);
     int previousToken = sample(llamaContext.llamaGetLogitsIth(tokens.length - 1), tokens.length);
 
     System.out.print(model.tokens().detokenize(previousToken));
@@ -100,12 +107,16 @@ public class Evaluator implements Closeable {
     for (int i = tokens.length + 1; previousToken != eosToken && i < contextSize; i++) {
       batch.token[0] = previousToken;
       batch.pos[0] = pos;
+      timeStamp1 = System.currentTimeMillis();
       decode();
+      timeStamp2 = System.currentTimeMillis();
+      evaluationTimings.add(timeStamp2 - timeStamp1);
       previousToken = sample(llamaContext.llamaGetLogitsIth(0), 1);
       previousTokens.add(previousToken);
       System.out.print(model.tokens().detokenize(previousToken));
       pos += 1;
     }
+    System.out.printf("%navgEvalTime=%.2f ms%n",  evaluationTimings.stream().mapToDouble(Long::doubleValue).average().getAsDouble());
   }
 
   private void decode() {
