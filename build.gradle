@@ -15,7 +15,7 @@ repositories {
 }
 
 ext {
-  jLlamaVersion = 'local-test-5-SNAPSHOT'
+  jLlamaVersion = 'local-test-6-SNAPSHOT'
 }
 
 dependencies {

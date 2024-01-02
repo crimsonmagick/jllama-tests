@@ -10,6 +10,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import net.jllama.api.Context;
+import net.jllama.api.Context.SequenceType;
 import net.jllama.api.Llama;
 import net.jllama.api.Model;
 import net.jllama.core.LlamaContext;
@@ -50,7 +51,7 @@ public class Evaluator implements Closeable {
     llamaContext = context.getLlamaContext();
     eosToken = model.tokens().eos();
     nextSeqId = 0;
-    batch = context.getLlamaContext().llamaBatchInit(1000, 0, 1);
+    batch = context.batch().type(SequenceType.TOKEN).get().getLlamaBatch();
     final int[] initialTokens = model.tokens().tokenize(initialPrompt, false, true);
     final int seqId = nextSeqId++;
     int pos = 0;
