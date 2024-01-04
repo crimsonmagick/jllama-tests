@@ -27,16 +27,16 @@ public class Main {
   public static void main(final String[] args) {
     try {
       final String piratePrompt =  "Let's role-play. You are a pirate on a desserted island, looking for treasure. Unfortunately, you've been stranded, and this makes you quite grumpy.";
-      final Evaluator evaluator = new Evaluator(systemPrompt(piratePrompt));
+      final Evaluator evaluator = new Evaluator();
 //      final String prompt1 = "Write a hashtable implementation in Java. Do not use `HashMap`, `Map`, or `HashTable` in the implementation. DO NOT IMPORT THOSE CLASSES. This class should be written from \"scratch\". The key should be a String, and the value an Object. The implementation should handle collisions.";
 //      final String prompt1 = "Write an example Spring Controller in Java.";
       final String prompt1 = "Tell me your tale, dear sir.";
-      evaluator.evaluate(chatPrompt(prompt1));
+      evaluator.evaluate(systemPrompt(piratePrompt) + chatPrompt(prompt1));
       System.out.println("------------------------------------------------");
       System.out.println("------------------------------------------------");
       System.out.println("------------------------------------------------");
       final String prompt2 = "Detail the evolutionary history of cats.";
-      evaluator.evaluate(chatPrompt(prompt2));
+      evaluator.evaluate(systemPrompt(piratePrompt) + chatPrompt(prompt2));
       evaluator.close();
     } catch (final Error e) {
       System.out.println("Fatal error occurred, errorMessage=" + e.getMessage());

@@ -13,6 +13,9 @@ import net.jllama.api.Context;
 import net.jllama.api.Context.SequenceType;
 import net.jllama.api.Llama;
 import net.jllama.api.Model;
+import net.jllama.api.Sequence;
+import net.jllama.api.Sequence.SequenceId;
+import net.jllama.api.batch.Batch;
 import net.jllama.core.LlamaContext;
 import net.jllama.core.LlamaContext.LlamaBatch;
 import net.jllama.core.LlamaCpp;
@@ -23,15 +26,12 @@ public class Evaluator implements Closeable {
 
   private final Llama llamaApi;
   private final int eosToken;
-  private final LlamaContext llamaContext;
   private final Model model;
   private final int contextSize;
   private final Context context;
-  private final LlamaBatch batch;
-  private final int systemPromptLength;
   private int nextSeqId;
 
-  Evaluator(final String initialPrompt) {
+  Evaluator() {
     final String modelPath = System.getProperty("modelpath");
     llamaApi = Llama.library();
 
@@ -43,31 +43,23 @@ public class Evaluator implements Closeable {
     contextSize = 3500;
     context = model.newContext()
         .withDefaults()
-        .nThreads(threads)
-        .nThreadsBatch(threads)
-        .nCtx(contextSize)
+        .evaluationThreads(threads)
+        .batchEvaluationThreads(threads)
+        .contextLength(contextSize)
         .seed(ThreadLocalRandom.current().nextInt())
         .create();
-    llamaContext = context.getLlamaContext();
     eosToken = model.tokens().eos();
     nextSeqId = 0;
-    batch = context.batch().type(SequenceType.TOKEN).get().getLlamaBatch();
-    final int[] initialTokens = model.tokens().tokenize(initialPrompt, false, true);
-    final int seqId = nextSeqId++;
-    int pos = 0;
-    batch.nTokens = initialTokens.length;
-    for (; pos < initialTokens.length; pos++) {
-      batch.token[pos] = initialTokens[pos];
-      batch.pos[pos] = pos;
-      batch.nSeqId[pos] = 1;
-      batch.seqId[pos][0] = seqId;
-      batch.logits[pos] = 0;
-    }
-    int ret = llamaContext.llamaDecode(batch);
-    if (ret != 0) {
-      throw new LlamaCppException("Initial decode failed with ret=" + ret);
-    }
-    systemPromptLength = pos;
+    final Batch batch = context.batch()
+        .type(SequenceType.TOKEN)
+        .configure()
+        .batchSize(1500)
+        .get();
+//    final int[] initialTokens = model.tokens().tokenize(initialPrompt, false, true);
+//    final int rawSeqId = nextSeqId++;
+//    final Sequence sequence = Sequence.sequence(new int[]{rawSeqId}, SequenceType.TOKEN);
+//    batch.stage(sequence.piece(initialTokens, new int[]{}));
+//    context.evaluate(batch);
   }
 
   public void evaluate(final String prompt) {
@@ -78,65 +70,44 @@ public class Evaluator implements Closeable {
     System.out.print(model.tokens().detokenize(toList(tokens)));
 
     final int seqId = nextSeqId++;
-    llamaContext.llamaKvCacheSeqCp(0, seqId, 0, systemPromptLength - 1);
-    int pos = systemPromptLength;
-    batch.nTokens = tokens.length;
-    for (int i = 0; i < tokens.length; i++) {
-      batch.token[i] = tokens[i];
-      batch.pos[i] = pos;
-      batch.nSeqId[i] = 1;
-      batch.seqId[i][0] = seqId;
-      batch.logits[i] = 0;
-      pos++;
-    }
-    batch.logits[tokens.length - 1] = 1;
+//    llamaContext.llamaKvCacheSeqCp(0, seqId, 0, systemPromptLength - 1);
+    final Batch batch = context.batch()
+        .type(SequenceType.TOKEN)
+        .get();
+    final Sequence sequence = Sequence.sequence(new int[]{seqId}, SequenceType.TOKEN);
+    batch.stage(sequence.piece(tokens, new int[]{tokens.length - 1}));
+
     long timeStamp1 = System.currentTimeMillis();
-    decode();
+    context.evaluate(batch);
     long timeStamp2 = System.currentTimeMillis();
     evaluationTimings.add(timeStamp2 - timeStamp1);
-    int previousToken = sample(llamaContext.llamaGetLogitsIth(tokens.length - 1), tokens.length);
+    int previousToken = sample(context.getLogitsAtIndex(sequence, tokens.length - 1), tokens.length);
 
     System.out.print(model.tokens().detokenize(previousToken));
 
-    final List<Integer> previousTokens = new ArrayList<>();
-    previousTokens.add(previousToken);
-
-    batch.nTokens = 1;
-    batch.nSeqId[0] = 1;
-    batch.seqId[0][0] = seqId;
-    batch.logits[0] = 1;
     for (int i = tokens.length + 1; previousToken != eosToken && i < contextSize; i++) {
-      batch.token[0] = previousToken;
-      batch.pos[0] = pos;
+      batch.stage(sequence.piece(new int[]{previousToken}, new int[]{0}));
       timeStamp1 = System.currentTimeMillis();
-      decode();
+      context.evaluate(batch);
       timeStamp2 = System.currentTimeMillis();
       evaluationTimings.add(timeStamp2 - timeStamp1);
-      previousToken = sample(llamaContext.llamaGetLogitsIth(0), 1);
-      previousTokens.add(previousToken);
+      previousToken = sample(context.getLogitsAtIndex(sequence, 0), 1);
       System.out.print(model.tokens().detokenize(previousToken));
-      pos += 1;
     }
-    System.out.printf("%navgEvalTime=%.2f ms%n",  evaluationTimings.stream().mapToDouble(Long::doubleValue).average().getAsDouble());
-  }
-
-  private void decode() {
-    final int decodeResult = llamaContext.llamaDecode(batch);
-    if (decodeResult != 0) {
-      throw new LlamaCppException("decode failed with ret=" + decodeResult);
-    }
+    System.out.printf("%navgEvalTime=%.2f ms%n", evaluationTimings.stream().mapToDouble(Long::doubleValue).average().getAsDouble());
   }
 
   private int sample(final float[] logits, final int tokenCount) {
+    final LlamaContext llamaContext = context.getLlamaContext();
     LlamaTokenDataArray candidates = LlamaTokenDataArray.logitsToTokenDataArray(logits);
-      llamaContext.llamaSampleTopK(candidates, 50, 1);
+    llamaContext.llamaSampleTopK(candidates, 50, 1);
 //      llamaContext.llamaSampleTopP(candidates, 0.9f, 1);
 //      llamaContext.llamaSampleSoftmax(candidates);
     llamaContext.llamaSampleTemp(candidates, 1.1f);
 //    llamaContext.llamaSampleTypical(candidates, 0.1f, 5);
 //    llamaContext.llamaSampleTailFree(candidates, 0.1f, 5);
 //    llamaContext.llamaSampleMinP(candidates, 0.1f, 5);
-    llamaContext.llamaSampleRepetitionPenalties(candidates, batch.token, tokenCount, 1f, 1.1f, 1.5f);
+//    llamaContext.llamaSampleRepetitionPenalties(candidates, batch.token, tokenCount, 1f, 1.1f, 1.5f);
 
     return llamaContext.llamaSampleToken(candidates);
   }
@@ -147,8 +118,10 @@ public class Evaluator implements Closeable {
 
   @Override
   public void close() {
-    batch.llamaBatchFree();
-    llamaContext.close();
+    context.batch()
+        .type(SequenceType.TOKEN)
+        .get()
+        .close();
     model.close();
     LlamaCpp.llamaBackendFree();
     LlamaCpp.closeLibrary();
