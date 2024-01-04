@@ -1,26 +1,17 @@
 package net.jllama.llama.cpp.java.bindings.runner;
 
 import java.io.Closeable;
-import java.time.LocalDateTime;
-import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import net.jllama.api.Context;
 import net.jllama.api.Context.SequenceType;
 import net.jllama.api.Llama;
 import net.jllama.api.Model;
 import net.jllama.api.Sequence;
-import net.jllama.api.Sequence.SequenceId;
 import net.jllama.api.batch.Batch;
-import net.jllama.core.LlamaContext;
-import net.jllama.core.LlamaContext.LlamaBatch;
-import net.jllama.core.LlamaCpp;
-import net.jllama.core.LlamaTokenDataArray;
-import net.jllama.core.exceptions.LlamaCppException;
 
 public class Evaluator implements Closeable {
 
@@ -81,7 +72,8 @@ public class Evaluator implements Closeable {
     context.evaluate(batch);
     long timeStamp2 = System.currentTimeMillis();
     evaluationTimings.add(timeStamp2 - timeStamp1);
-    int previousToken = sample(context.getLogitsAtIndex(sequence, tokens.length - 1), tokens.length);
+    List<Integer> previousTokens = new ArrayList<>();
+    int previousToken = sample(context.getLogitsAtIndex(sequence, tokens.length - 1), previousTokens);
 
     System.out.print(model.tokens().detokenize(previousToken));
 
@@ -91,25 +83,27 @@ public class Evaluator implements Closeable {
       context.evaluate(batch);
       timeStamp2 = System.currentTimeMillis();
       evaluationTimings.add(timeStamp2 - timeStamp1);
-      previousToken = sample(context.getLogitsAtIndex(sequence, 0), 1);
+      previousToken = sample(context.getLogitsAtIndex(sequence, 0), previousTokens);
       System.out.print(model.tokens().detokenize(previousToken));
     }
     System.out.printf("%navgEvalTime=%.2f ms%n", evaluationTimings.stream().mapToDouble(Long::doubleValue).average().getAsDouble());
   }
 
-  private int sample(final float[] logits, final int tokenCount) {
-    final LlamaContext llamaContext = context.getLlamaContext();
-    LlamaTokenDataArray candidates = LlamaTokenDataArray.logitsToTokenDataArray(logits);
-    llamaContext.llamaSampleTopK(candidates, 50, 1);
-//      llamaContext.llamaSampleTopP(candidates, 0.9f, 1);
-//      llamaContext.llamaSampleSoftmax(candidates);
-    llamaContext.llamaSampleTemp(candidates, 1.1f);
-//    llamaContext.llamaSampleTypical(candidates, 0.1f, 5);
-//    llamaContext.llamaSampleTailFree(candidates, 0.1f, 5);
-//    llamaContext.llamaSampleMinP(candidates, 0.1f, 5);
-//    llamaContext.llamaSampleRepetitionPenalties(candidates, batch.token, tokenCount, 1f, 1.1f, 1.5f);
+  private int sample(final float[] logits, final List<Integer> previousTokensList) {
+    final int[] previousTokens = previousTokensList.stream()
+        .mapToInt(Integer::valueOf)
+        .toArray();
+    return context.sampler(logits)
+//        .keepTopK(50)
+//        .applyTemperature(1.1f)
+//        .keepMinP(0.4f)
+//        .keepTopP(0.9f)
+//        .applySoftmax()
+//        .applyLocallyTypical(0.1f)
+//        .applyTailFree(0.1f)
+        .applyRepetitionPenalties(previousTokens, 1f, 1.1f, 1.5f)
+        .sample();
 
-    return llamaContext.llamaSampleToken(candidates);
   }
 
   private static List<Integer> toList(int[] tokens) {
@@ -123,7 +117,6 @@ public class Evaluator implements Closeable {
         .get()
         .close();
     model.close();
-    LlamaCpp.llamaBackendFree();
-    LlamaCpp.closeLibrary();
+    llamaApi.close();
   }
 }
