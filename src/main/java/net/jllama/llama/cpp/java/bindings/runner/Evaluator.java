@@ -3,6 +3,7 @@ package net.jllama.llama.cpp.java.bindings.runner;
 import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
@@ -55,30 +56,30 @@ public class Evaluator implements Closeable {
 
   public void evaluate(final String prompt) {
     final List<Long> evaluationTimings = new ArrayList<>();
-    final int[] tokens = model.tokens().tokenize(prompt);
+    final List<Integer> tokens = model.tokens().tokenize(prompt);
 
     // initial prompt
-    System.out.print(model.tokens().detokenize(toList(tokens)));
+    System.out.print(model.tokens().detokenize(tokens));
 
     final int seqId = nextSeqId++;
 //    llamaContext.llamaKvCacheSeqCp(0, seqId, 0, systemPromptLength - 1);
     final Batch batch = context.batch()
         .type(SequenceType.TOKEN)
         .get();
-    final Sequence sequence = Sequence.sequence(new int[]{seqId}, SequenceType.TOKEN);
-    batch.stage(sequence.piece(tokens, new int[]{tokens.length - 1}));
+    final Sequence sequence = Sequence.sequence(seqId, SequenceType.TOKEN);
+    batch.stage(sequence.piece(tokens, Collections.singletonList(tokens.size() - 1)));
 
     long timeStamp1 = System.currentTimeMillis();
     context.evaluate(batch);
     long timeStamp2 = System.currentTimeMillis();
     evaluationTimings.add(timeStamp2 - timeStamp1);
     List<Integer> previousTokens = new ArrayList<>();
-    int previousToken = sample(context.getLogitsAtIndex(sequence, tokens.length - 1), previousTokens);
+    int previousToken = sample(context.getLogitsAtIndex(sequence, tokens.size() - 1), previousTokens);
 
     System.out.print(model.tokens().detokenize(previousToken));
 
-    for (int i = tokens.length + 1; previousToken != eosToken && i < contextSize; i++) {
-      batch.stage(sequence.piece(new int[]{previousToken}, new int[]{0}));
+    for (int i = tokens.size() + 1; previousToken != eosToken && i < contextSize; i++) {
+      batch.stage(sequence.piece(Collections.singletonList(previousToken), Collections.singletonList(0)));
       timeStamp1 = System.currentTimeMillis();
       context.evaluate(batch);
       timeStamp2 = System.currentTimeMillis();
@@ -89,10 +90,7 @@ public class Evaluator implements Closeable {
     System.out.printf("%navgEvalTime=%.2f ms%n", evaluationTimings.stream().mapToDouble(Long::doubleValue).average().getAsDouble());
   }
 
-  private int sample(final float[] logits, final List<Integer> previousTokensList) {
-    final int[] previousTokens = previousTokensList.stream()
-        .mapToInt(Integer::valueOf)
-        .toArray();
+  private int sample(final List<Float> logits, final List<Integer> previousTokens) {
     return context.sampler(logits)
 //        .keepTopK(50)
 //        .applyTemperature(1.1f)
