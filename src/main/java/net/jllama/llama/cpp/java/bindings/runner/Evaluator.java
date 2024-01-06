@@ -1,6 +1,5 @@
 package net.jllama.llama.cpp.java.bindings.runner;
 
-import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -12,7 +11,7 @@ import net.jllama.api.Llama;
 import net.jllama.api.Model;
 import net.jllama.api.Sequence;
 
-public class Evaluator implements Closeable {
+public class Evaluator implements AutoCloseable {
 
   private final Llama llamaApi;
   private final int eosToken;
